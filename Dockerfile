@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 
 LABEL maintainer="Jonathon Byrdziak"
 
-ARG NODE_VERSION=18
+ARG NODE_VERSION=20
 ARG USER_ID=1000
 ARG GROUP_ID=1000 
 
@@ -34,7 +34,7 @@ RUN addgroup --gid ${GROUP_ID} www-data &&\
 RUN apt-get update \
     && apt-get install lsb-release ca-certificates apt-transport-https software-properties-common -y \
     && add-apt-repository ppa:ondrej/php \
-    && apt-get install -y gnupg gosu curl zip unzip git supervisor sqlite3 libcap2-bin libpng-dev python2
+    && apt-get install -y gnupg gosu curl zip unzip git supervisor sqlite3 libcap2-bin libpng-dev python3
 
 
 RUN apt-get update \
@@ -63,26 +63,10 @@ RUN apt-get update \
     && apt-get update -y \
     && apt-get install nginx -y
 
-# Install Databricks Driver
-RUN apt-get update \
-    && apt-get install -y unixodbc unixodbc-dev libsasl2-modules-gssapi-mit wget
-RUN wget https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/odbc/2.6.29/SimbaSparkODBC-2.6.29.1049-Debian-64bit.zip
-RUN unzip SimbaSparkODBC-2.6.29.1049-Debian-64bit.zip
-RUN dpkg -i simbaspark_2.6.29.1049-2_amd64.deb
-
-# Fix ODBC MaxStringLength 255
-RUN wget https://github.com/php/php-src/archive/refs/tags/php-$(php -r 'echo PHP_VERSION;').zip
-RUN unzip php-$(php -r 'echo PHP_VERSION;').zip
-RUN sed -i 's/if (colsize < 256 && !S->going_long) {/if (1) {/g' php-src-php-$(php -r 'echo PHP_VERSION;')/ext/pdo_odbc/odbc_stmt.c
-RUN cd php-src-php-$(php -r 'echo PHP_VERSION;')/ext/pdo_odbc \
-    && phpize \
-    && ./configure --with-pdo-odbc=unixODBC,/usr/ \
-    && make install
-
 # A couple tools for us
 RUN apt-get update \
-   && apt-get install pip -y \
-   && pip install ngxtop nano
+   && apt-get install python3-pip -y \
+   && pip3 install ngxtop nano
 
 #RUN apt-get update && \
 #      apt-get -y install sudo
