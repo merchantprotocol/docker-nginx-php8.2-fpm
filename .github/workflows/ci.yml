@@ -1,0 +1,131 @@
+name: CI — Build & Security Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build, Test & Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: dataripple-org/nginx-php82-fpm:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start container
+        run: |
+          docker run -d \
+            --name nginx-php82-fpm \
+            -p 8082:80 \
+            -p 8443:443 \
+            -v ${{ github.workspace }}/html:/var/www/html \
+            dataripple-org/nginx-php82-fpm:ci
+          echo "Waiting for container to start..."
+          sleep 10
+
+      - name: Test — Health check
+        run: |
+          curl -sf http://localhost:8082/elb-status | grep -q "A-OK"
+          echo "PASS: /elb-status returns 200"
+
+      - name: Test — HTTPS redirect
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/)
+          [ "$STATUS" = "301" ]
+          echo "PASS: HTTP / returns 301 redirect"
+
+      - name: Test — Security headers
+        run: |
+          HEADERS=$(curl -sk -I https://localhost:8443/)
+          echo "$HEADERS" | grep -qi "X-Frame-Options" && echo "PASS: X-Frame-Options"
+          echo "$HEADERS" | grep -qi "X-Content-Type-Options" && echo "PASS: X-Content-Type-Options"
+          echo "$HEADERS" | grep -qi "Strict-Transport-Security" && echo "PASS: HSTS"
+          echo "$HEADERS" | grep -qi "Referrer-Policy" && echo "PASS: Referrer-Policy"
+
+      - name: Test — TLS 1.2+
+        run: |
+          curl -sk --tlsv1.2 https://localhost:8443/elb-status > /dev/null 2>&1
+          echo "PASS: TLS 1.2 accepted"
+
+      - name: Test — WAF blocks SQL injection
+        run: |
+          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://localhost:8443/?id=1%20OR%201=1")
+          [ "$STATUS" = "403" ]
+          echo "PASS: SQL injection blocked (403)"
+
+      - name: Test — Blocked paths
+        run: |
+          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" https://localhost:8443/.env)
+          [ "$STATUS" = "403" ] && echo "PASS: .env blocked"
+          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" https://localhost:8443/.git/config)
+          [ "$STATUS" = "403" ] && echo "PASS: .git blocked"
+          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" https://localhost:8443/vendor/autoload.php)
+          [ "$STATUS" = "403" ] && echo "PASS: /vendor blocked"
+          STATUS=$(curl -sk -o /dev/null -w "%{http_code}" https://localhost:8443/database.sql)
+          [ "$STATUS" = "403" ] && echo "PASS: .sql blocked"
+
+      - name: Test — PHP 8.2 (no dev tools)
+        run: |
+          docker exec nginx-php82-fpm php -v | grep -q "PHP 8.2" && echo "PASS: PHP 8.2 installed"
+          docker exec nginx-php82-fpm pgrep -x php-fpm8.2 > /dev/null && echo "PASS: PHP-FPM running"
+          ! docker exec nginx-php82-fpm php -m | grep -qi "xdebug" && echo "PASS: xdebug not installed"
+          ! docker exec nginx-php82-fpm dpkg -l | grep -q "php8.2-dev" && echo "PASS: php8.2-dev not installed"
+
+      - name: Test — Services running
+        run: |
+          docker exec nginx-php82-fpm pgrep -x nginx > /dev/null && echo "PASS: nginx running"
+          docker exec nginx-php82-fpm pgrep -f supervisord > /dev/null && echo "PASS: supervisor running"
+          docker exec nginx-php82-fpm pgrep -x cron > /dev/null && echo "PASS: cron running"
+          docker exec nginx-php82-fpm test -d /var/ossec && echo "PASS: wazuh installed"
+
+      - name: Test — Permissions
+        run: |
+          docker exec nginx-php82-fpm id www-data | grep -q "uid=1000" && echo "PASS: www-data UID 1000"
+          docker exec nginx-php82-fpm id www-data | grep -q "gid=1000" && echo "PASS: www-data GID 1000"
+
+      - name: Collect container logs on failure
+        if: failure()
+        run: |
+          docker logs nginx-php82-fpm 2>&1
+          docker exec nginx-php82-fpm cat /var/log/nginx/error.log 2>/dev/null || true
+
+      - name: Stop container
+        if: always()
+        run: |
+          docker stop nginx-php82-fpm || true
+          docker rm nginx-php82-fpm || true
+
+      # SOC 2 CC6.1 — Vulnerability scanning
+      - name: Scan image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: dataripple-org/nginx-php82-fpm:ci
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+          output: trivy-results.txt
+
+      - name: Upload vulnerability scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-vulnerability-report
+          path: trivy-results.txt
+          retention-days: 90

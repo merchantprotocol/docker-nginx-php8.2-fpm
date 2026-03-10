@@ -1,0 +1,38 @@
+name: Weekly Security Scan
+
+on:
+  schedule:
+    # Every Monday at 6:00 AM UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vulnerability-scan:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t dataripple-org/nginx-php82-fpm:scan .
+
+      - name: Scan for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: dataripple-org/nginx-php82-fpm:scan
+          format: table
+          exit-code: 1
+          severity: CRITICAL
+          output: trivy-weekly-report.txt
+
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-vulnerability-report-${{ github.run_number }}
+          path: trivy-weekly-report.txt
+          retention-days: 365
