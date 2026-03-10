@@ -1,2 +1,18 @@
 .DS_Store
 /.idea
+.vscode/
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Runtime artifacts
+*.log
+*.swp
+*.swo
+*~
+/tmp/
+/node_modules/
+/vendor/

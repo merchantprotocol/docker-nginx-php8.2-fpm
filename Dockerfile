@@ -123,8 +123,9 @@ COPY php/opcache.ini /etc/php/8.2/mods-available/opcache.ini
 RUN mkdir -p /var/run/php
 
 RUN rm -f /var/www/html/index.nginx-debian.html
-RUN mkdir /var/www/html/nginx.d/ 
+RUN mkdir /var/www/html/nginx.d/
 COPY html/* /var/www/html/
+RUN rm -f /var/www/html/info.php
 
 # Installing the cron
 RUN apt-get update -y && apt-get install cron -yqq
