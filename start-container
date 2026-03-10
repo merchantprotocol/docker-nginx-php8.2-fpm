@@ -49,7 +49,16 @@ if test -e /var/www/html/docker.d/; then
 
 fi
 
-# start the a container services
+# Enable Wazuh agent only when WAZUH_MANAGER is configured
+if [ -n "$WAZUH_MANAGER" ] && [ -f /var/ossec/etc/ossec.conf ]; then
+    sed -i "s|<address>.*</address>|<address>${WAZUH_MANAGER}</address>|" /var/ossec/etc/ossec.conf
+    if [ -n "$WAZUH_AGENT_NAME" ]; then
+        sed -i "s|<agent_name>.*</agent_name>|<agent_name>${WAZUH_AGENT_NAME}</agent_name>|" /var/ossec/etc/ossec.conf
+    fi
+    sed -i 's/autostart=false/autostart=true/' /etc/supervisor/conf.d/supervisord.conf
+fi
+
+# start the container services
 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 
 # Setting web application permissions
