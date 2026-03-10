@@ -1,0 +1,11 @@
+# Default owners for everything in the repo
+* @jonathonbyrdziak
+
+# Security-sensitive files require explicit review
+Dockerfile @jonathonbyrdziak
+nginx/ @jonathonbyrdziak
+php/ @jonathonbyrdziak
+wazuh/ @jonathonbyrdziak
+supervisord.conf @jonathonbyrdziak
+start-container @jonathonbyrdziak
+.github/workflows/ @jonathonbyrdziak
