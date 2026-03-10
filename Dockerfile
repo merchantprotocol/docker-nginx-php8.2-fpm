@@ -9,44 +9,41 @@ ARG GROUP_ID=1000
 WORKDIR /var/www/html
 USER root
 
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-## Set proper user/group permissions before running scripts 
-# www-data:www-data maps to user 33:33, we want it to map to 1000:1000, 
-# the primary user on the host machine
-RUN userdel -f www-data \
-    && if getent group www-data ; then groupdel www-data; fi
-
-# The dialout group conflicts with MAC and removing it isn't a problem...
-RUN if getent group dialout ; then groupdel dialout; fi
-
-RUN addgroup --gid ${GROUP_ID} www-data &&\
-    useradd -l -u ${USER_ID} -g www-data www-data &&\
-    install -d -m 0755 -o www-data -g www-data /home/www-data &&\
-    chown --changes --silent --no-dereference --recursive \
-          --from=33:33 ${USER_ID}:${GROUP_ID} \
-        /home/www-data
+## Remap www-data to match host UID/GID for volume mount permissions
+# Ubuntu 24.04 ships with 'ubuntu' user at 1000:1000 and 'www-data' at 33:33.
+# We need www-data at the target UID/GID so mounted files have correct ownership
+# on both the host and inside the container.
+RUN userdel -f ubuntu 2>/dev/null; \
+    groupdel ubuntu 2>/dev/null; \
+    userdel -f www-data 2>/dev/null; \
+    groupdel www-data 2>/dev/null; \
+    groupdel dialout 2>/dev/null; \
+    groupadd --gid ${GROUP_ID} www-data && \
+    useradd -l -u ${USER_ID} -g www-data -d /home/www-data -s /bin/bash www-data && \
+    install -d -m 0755 -o www-data -g www-data /home/www-data
 
 RUN apt-get update \
     && apt-get install lsb-release ca-certificates apt-transport-https software-properties-common -y \
     && add-apt-repository ppa:ondrej/php \
-    && apt-get install -y gnupg gosu curl zip unzip git supervisor sqlite3 libcap2-bin libpng-dev python3
+    && apt-get install -y gnupg curl zip unzip git supervisor sqlite3 libcap2-bin libpng-dev python3
 
 
 RUN apt-get update \
-    && apt-get install -y php8.2-cli php8.2-dev \
+    && apt-get install -y php8.2-cli \
        php8.2-pgsql php8.2-sqlite3 php8.2-odbc php8.2-gd \
        php8.2-curl php8.2-memcached \
        php8.2-imap php8.2-mysql php8.2-mbstring \
        php8.2-xml php8.2-zip php8.2-bcmath php8.2-soap \
-       php8.2-intl php8.2-readline php8.2-pcov \
+       php8.2-intl php8.2-readline \
        php8.2-msgpack php8.2-igbinary php8.2-ldap \
        php8.2-redis \
        php8.2-fpm \
-    && php -r "readfile('http://getcomposer.org/installer');" | php -- --install-dir=/usr/bin/ --filename=composer \
+    && php -r "readfile('https://getcomposer.org/installer');" | php -- --install-dir=/usr/bin/ --filename=composer \
     && curl -sL https://deb.nodesource.com/setup_$NODE_VERSION.x | bash - \
     && apt-get install -y nodejs \
     && npm install -g npm \
@@ -62,16 +59,51 @@ RUN apt-get update \
     && apt-get update -y \
     && apt-get install nginx -y
 
+# ModSecurity 3 WAF + OWASP Core Rule Set (SOC 2 compliance)
+ARG OWASP_CRS_VERSION=4.4.0
+RUN apt-get update \
+   && apt-get install -y libmodsecurity3 libmodsecurity-dev libnginx-mod-http-modsecurity wget \
+   && mkdir -p /etc/nginx/modsec /var/log/modsec \
+   && find / -name "modsecurity.conf-recommended" -o -name "modsecurity.conf" 2>/dev/null | head -1 | xargs -I {} cp {} /etc/nginx/modsec/modsecurity.conf \
+   && if [ ! -f /etc/nginx/modsec/modsecurity.conf ]; then \
+      wget -qO /etc/nginx/modsec/modsecurity.conf https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/modsecurity.conf-recommended; \
+   fi \
+   && sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/' /etc/nginx/modsec/modsecurity.conf \
+   && sed -i 's|SecAuditLog /var/log/modsec_audit.log|SecAuditLog /var/log/modsec/audit.log|' /etc/nginx/modsec/modsecurity.conf \
+   && find / -name "unicode.mapping" 2>/dev/null | head -1 | xargs -I {} cp {} /etc/nginx/modsec/unicode.mapping \
+   && if [ ! -f /etc/nginx/modsec/unicode.mapping ]; then \
+      wget -qO /etc/nginx/modsec/unicode.mapping https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/unicode.mapping; \
+   fi \
+   && wget -qO /tmp/crs.tar.gz https://github.com/coreruleset/coreruleset/archive/refs/tags/v${OWASP_CRS_VERSION}.tar.gz \
+   && tar -xzf /tmp/crs.tar.gz -C /etc/nginx/modsec/ \
+   && mv /etc/nginx/modsec/coreruleset-${OWASP_CRS_VERSION} /etc/nginx/modsec/crs \
+   && cp /etc/nginx/modsec/crs/crs-setup.conf.example /etc/nginx/modsec/crs/crs-setup.conf \
+   && rm /tmp/crs.tar.gz
+
+# ModSecurity main include file
+RUN printf '%s\n' \
+   'Include /etc/nginx/modsec/modsecurity.conf' \
+   'Include /etc/nginx/modsec/crs/crs-setup.conf' \
+   'Include /etc/nginx/modsec/crs/rules/*.conf' \
+   > /etc/nginx/modsec/main.conf
+
+# Wazuh Agent for SOC 2 SIEM reporting
+ARG WAZUH_VERSION=4.9.0
+ARG WAZUH_MANAGER=wazuh-manager
+RUN curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --dearmor -o /usr/share/keyrings/wazuh.gpg \
+   && echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" > /etc/apt/sources.list.d/wazuh.list \
+   && apt-get update \
+   && WAZUH_MANAGER=${WAZUH_MANAGER} apt-get install -y wazuh-agent=${WAZUH_VERSION}-* \
+   && mkdir -p /var/log/php-fpm
+
+# Wazuh agent config: monitor nginx, modsecurity, php-fpm, and cron logs
+COPY wazuh/ossec.conf /var/ossec/etc/ossec.conf
+
 # A couple tools for us
 RUN apt-get update \
-   && apt-get install python3-pip -y \
-   && pip3 install ngxtop nano
-
-#RUN apt-get update && \
-#      apt-get -y install sudo
-
-#RUN curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash \
-#    && NR_INSTALL_SILENT=1 /usr/local/bin/newrelic install -n nginx-open-source-integration
+   && apt-get install -y nano pipx \
+   && pipx install ngxtop \
+   && pipx ensurepath
 
 RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.2
 RUN mkdir /opt/scripts/
@@ -111,12 +143,12 @@ RUN touch /var/log/cron.log
 RUN mkdir /var/log/cron/
 RUN chmod 0600 /etc/cron.d/webapp
 
-#######  Turn on/Run the container #########
-RUN service php8.2-fpm start
 RUN chmod +x /usr/local/bin/start-container
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -sf http://localhost/elb-status || exit 1
 
 EXPOSE 80
 EXPOSE 443
 
-## Finally start the container services...
 ENTRYPOINT ["start-container"]
