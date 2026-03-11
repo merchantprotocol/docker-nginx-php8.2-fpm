@@ -1,6 +1,24 @@
-# Nginx + PHP 8.2 FPM
+<p align="center">
+  <h1 align="center">Nginx + PHP 8.2 FPM</h1>
+  <p align="center">
+    A production-grade, SOC 2 compliant Docker image for PHP web applications. Built on Ubuntu 24.04 with Nginx, PHP 8.2 FPM, ModSecurity WAF, and Wazuh SIEM integration.
+    <br />
+    <a href="docs/ARCHITECTURE.md"><strong>Architecture</strong></a>
+    &middot;
+    <a href="docs/SOC2-COMPLIANCE.md"><strong>SOC 2 Compliance</strong></a>
+  </p>
+</p>
 
-A production-grade, SOC 2 compliant Docker image for PHP web applications. Built on Ubuntu 24.04 with Nginx, PHP 8.2 FPM, ModSecurity WAF, and Wazuh SIEM integration.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red.svg" alt="Proprietary License"></a>
+  <img src="https://img.shields.io/badge/php-8.2-8892BF.svg" alt="PHP 8.2">
+  <img src="https://img.shields.io/badge/ubuntu-24.04%20LTS-E95420.svg" alt="Ubuntu 24.04">
+  <img src="https://img.shields.io/badge/nginx-latest-009639.svg" alt="Nginx">
+  <img src="https://img.shields.io/badge/ModSecurity-OWASP%20CRS%204.4-blue.svg" alt="ModSecurity WAF">
+  <img src="https://img.shields.io/badge/SOC2-Type%20II%20Ready-green.svg" alt="SOC2 Type II Ready">
+</p>
+
+---
 
 ## Features
 
