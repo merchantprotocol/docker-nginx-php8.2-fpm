@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red.svg" alt="Proprietary License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/php-8.2-8892BF.svg" alt="PHP 8.2">
   <img src="https://img.shields.io/badge/ubuntu-24.04%20LTS-E95420.svg" alt="Ubuntu 24.04">
   <img src="https://img.shields.io/badge/nginx-latest-009639.svg" alt="Nginx">
@@ -169,4 +169,6 @@ bcmath, cli, curl, fpm, gd, igbinary, imap, intl, ldap, mbstring, memcached, msg
 
 ## License
 
-Proprietary software. Copyright Merchant Protocol, LLC. Licensed to Dataripple.
+Open-source software licensed under the [MIT License](LICENSE).
+
+Copyright (c) 2024-2026 [Merchant Protocol, LLC](https://merchantprotocol.com/)
