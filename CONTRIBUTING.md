@@ -6,7 +6,7 @@ This is a SOC 2 compliant production infrastructure image. All changes go throug
 
 - [Docker](https://docs.docker.com/get-docker/)
 - [just](https://github.com/casey/just) command runner
-- Access to the `dataripple-org` GitHub organization
+- Access to the `merchantprotocol` GitHub organization
 
 ## Workflow
 
@@ -150,4 +150,4 @@ When updating a pinned version:
 
 ## Questions
 
-Open a [Feature Request](https://github.com/dataripple-org/docker-nginx-php8.2-fpm/issues/new?template=feature_request.yml) or [Bug Report](https://github.com/dataripple-org/docker-nginx-php8.2-fpm/issues/new?template=bug_report.yml) if you're unsure about something.
+Open a [Feature Request](https://github.com/merchantprotocol/docker-nginx-php8.2-fpm/issues/new?template=feature_request.yml) or [Bug Report](https://github.com/merchantprotocol/docker-nginx-php8.2-fpm/issues/new?template=bug_report.yml) if you're unsure about something.

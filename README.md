@@ -62,7 +62,7 @@ The container exposes:
 ```yaml
 services:
   app:
-    image: dataripple-org/nginx-php82-fpm:latest
+    image: merchantprotocol/nginx-php82-fpm:latest
     restart: unless-stopped
     ports:
       - "80:80"
@@ -105,7 +105,7 @@ just run-with-uid 1001 1001
 Or pass build args directly:
 
 ```bash
-docker build --build-arg USER_ID=1001 --build-arg GROUP_ID=1001 -t dataripple-org/nginx-php82-fpm .
+docker build --build-arg USER_ID=1001 --build-arg GROUP_ID=1001 -t merchantprotocol/nginx-php82-fpm .
 ```
 
 ## Security
