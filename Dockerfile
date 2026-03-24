@@ -109,7 +109,7 @@ RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.2
 RUN mkdir /opt/scripts/
 
 COPY start-container /usr/local/bin/start-container
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY supervisord.conf /etc/supervisor/supervisord.conf
 
 COPY nginx/make-localhost-cert /opt/scripts/make-localhost-cert
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
