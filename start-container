@@ -27,7 +27,8 @@ if test -e /var/www/html/nginx.d/php.ini; then
     cp /var/www/html/nginx.d/php.ini /etc/php/8.2/cli/php.ini
 fi
 
-# Moving potential supervisor files
+# Moving potential supervisor files — clear stale configs first
+rm -f /etc/supervisor/conf.d/*.conf 2>/dev/null
 if test -d /var/www/html/supervisor.d/; then
     cp -r /var/www/html/supervisor.d/* /etc/supervisor/conf.d/
 fi
